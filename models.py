@@ -64,6 +64,9 @@ class Scan(Base):
     findings: Mapped[List["Finding"]] = relationship(
         back_populates="scan", cascade="all, delete-orphan", lazy="selectin"
     )
+    artifacts: Mapped[List["Artifact"]] = relationship(
+        back_populates="scan", cascade="all, delete-orphan", lazy="selectin"
+    )
 
 
 class Finding(Base):
@@ -79,3 +82,18 @@ class Finding(Base):
     line: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     scan: Mapped["Scan"] = relationship(back_populates="findings")
+
+
+class Artifact(Base):
+    __tablename__ = "artifacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    scan_id: Mapped[int] = mapped_column(ForeignKey("scans.id"))
+    artifact_type: Mapped[str] = mapped_column(String(20))  # mitre, sigma, atomic, gap
+    filename: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    content: Mapped[str] = mapped_column(String(100000))  # Large text storage
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    scan: Mapped["Scan"] = relationship(back_populates="artifacts")

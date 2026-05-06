@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 
 from groovehub.db import get_session
 from groovehub.github import parse_repo_url, fetch_metadata, clone_repo
-from groovehub.models import Server, Scan, Finding
+from groovehub.models import Server, Scan, Finding, Artifact
 from groovehub.scanner import scan_directory, score_directory
 from groovehub.scorer import SecurityGrade
+from groovehub.purpleforge import generate_all_artifacts
 
 app = FastAPI(
     title="GrooveHub API",
@@ -165,6 +166,55 @@ def scan_server(
             )
             session.add(db_finding)
 
+        session.commit()
+
+        # Generate PurpleForge artifacts
+        findings_dicts = [
+            {
+                "rule_id": f.rule_id,
+                "type": f.rule_id,
+                "severity": f.severity,
+                "title": f.title,
+                "message": f.message,
+            }
+            for f in scan_result.findings
+        ]
+        artifacts = generate_all_artifacts(findings_dicts)
+
+        # Store MITRE map
+        session.add(Artifact(
+            scan_id=scan.id,
+            artifact_type="mitre",
+            filename="mitre_mapping.json",
+            content=artifacts["mitre"],
+        ))
+
+        # Store Sigma rules
+        for rule in artifacts["sigma_rules"]:
+            session.add(Artifact(
+                scan_id=scan.id,
+                artifact_type="sigma",
+                filename=rule["filename"],
+                content=rule["content"],
+            ))
+
+        # Store atomic tests
+        for test in artifacts["atomic_tests"]:
+            session.add(Artifact(
+                scan_id=scan.id,
+                artifact_type="atomic",
+                filename=test["filename"],
+                content=test["content"],
+            ))
+
+        # Store gap report
+        session.add(Artifact(
+            scan_id=scan.id,
+            artifact_type="gap",
+            filename="gap_report.md",
+            content=artifacts["gap_report"],
+        ))
+
         # Update server last_scanned_at
         server.last_scanned_at = datetime.now(timezone.utc)
         session.commit()
@@ -245,3 +295,106 @@ def leaderboard(
             "grade": scan.grade,
         })
     return result
+
+
+# ── PurpleForge Artifact Endpoints ──
+
+@app.get("/servers/{server_id}/mitre")
+def get_mitre_map(
+    server_id: int,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Get the MITRE ATT&CK mapping for the latest scan."""
+    server = session.get(Server, server_id)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    latest = server.latest_scan
+    if not latest:
+        raise HTTPException(status_code=404, detail="No scans available")
+
+    artifact = (
+        session.query(Artifact)
+        .filter_by(scan_id=latest.id, artifact_type="mitre")
+        .first()
+    )
+    if not artifact:
+        raise HTTPException(status_code=404, detail="MITRE map not generated yet")
+
+    import json
+    return {"server": server.full_name, "mitre_map": json.loads(artifact.content)}
+
+
+@app.get("/servers/{server_id}/sigma")
+def get_sigma_rules(
+    server_id: int,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Get generated Sigma rules for the latest scan."""
+    server = session.get(Server, server_id)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    latest = server.latest_scan
+    if not latest:
+        raise HTTPException(status_code=404, detail="No scans available")
+
+    artifacts = (
+        session.query(Artifact)
+        .filter_by(scan_id=latest.id, artifact_type="sigma")
+        .all()
+    )
+    return {
+        "server": server.full_name,
+        "rules": [{"filename": a.filename, "content": a.content} for a in artifacts],
+    }
+
+
+@app.get("/servers/{server_id}/atomic")
+def get_atomic_tests(
+    server_id: int,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Get generated atomic tests for the latest scan."""
+    server = session.get(Server, server_id)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    latest = server.latest_scan
+    if not latest:
+        raise HTTPException(status_code=404, detail="No scans available")
+
+    artifacts = (
+        session.query(Artifact)
+        .filter_by(scan_id=latest.id, artifact_type="atomic")
+        .all()
+    )
+    return {
+        "server": server.full_name,
+        "tests": [{"filename": a.filename, "content": a.content} for a in artifacts],
+    }
+
+
+@app.get("/servers/{server_id}/gap-report")
+def get_gap_report(
+    server_id: int,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Get the purple team gap analysis report."""
+    server = session.get(Server, server_id)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    latest = server.latest_scan
+    if not latest:
+        raise HTTPException(status_code=404, detail="No scans available")
+
+    artifact = (
+        session.query(Artifact)
+        .filter_by(scan_id=latest.id, artifact_type="gap")
+        .first()
+    )
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Gap report not generated yet")
+
+    return {"server": server.full_name, "report": artifact.content}

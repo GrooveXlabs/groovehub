@@ -248,5 +248,38 @@ def serve() -> None:
     uvicorn.run("groovehub.api:app", host="127.0.0.1", port=8000, reload=False)
 
 
+@main.command(name="artifacts")
+@click.argument("server_id", type=int)
+@click.option("--type", "artifact_type", default="all", help="Filter by type: mitre, sigma, atomic, gap, all")
+def show_artifacts(server_id: int, artifact_type: str) -> None:
+    """Show PurpleForge artifacts for a server's latest scan."""
+    with next(get_session()) as session:
+        server = session.get(Server, server_id)
+        if not server:
+            console.print(f"[red]Server {server_id} not found.[/red]")
+            sys.exit(1)
+
+        latest = server.latest_scan
+        if not latest:
+            console.print(f"[yellow]Server {server.full_name} has not been scanned yet.[/yellow]")
+            return
+
+        query = session.query(Artifact).filter_by(scan_id=latest.id)
+        if artifact_type != "all":
+            query = query.filter_by(artifact_type=artifact_type)
+
+        artifacts = query.all()
+
+    if not artifacts:
+        console.print(f"[yellow]No artifacts found for {server.full_name}.[/yellow]")
+        return
+
+    console.print(f"[cyan]Artifacts for {server.full_name} (scan #{latest.id})[/cyan]")
+    for a in artifacts:
+        color = {"mitre": "blue", "sigma": "green", "atomic": "yellow", "gap": "magenta"}.get(a.artifact_type, "white")
+        console.print(f"\n[{color}]{a.artifact_type.upper()}: {a.filename}[/{color}]")
+        console.print(a.content[:800] + "..." if len(a.content) > 800 else a.content)
+
+
 if __name__ == "__main__":
     main()
