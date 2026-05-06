@@ -54,11 +54,41 @@ GrooveHub exposes a FastAPI REST API:
 | `GET`  | `/servers/{id}` | Get server details + latest scan |
 | `POST` | `/servers/{id}/scan` | Trigger a security scan |
 | `GET`  | `/servers/{id}/scans` | List all scans for a server |
+| `GET`  | `/servers/{id}/mitre` | MITRE ATT&CK mapping |
+| `GET`  | `/servers/{id}/sigma` | Generated Sigma detection rules |
+| `GET`  | `/servers/{id}/atomic` | Generated atomic test scripts |
+| `GET`  | `/servers/{id}/gap-report` | Purple team gap analysis |
 | `GET`  | `/leaderboard` | Top servers by security score |
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/servers?repo_url=https://github.com/modelcontextprotocol/servers"
 curl "http://127.0.0.1:8000/leaderboard"
+curl "http://127.0.0.1:8000/servers/1/mitre"
+curl "http://127.0.0.1:8000/servers/1/sigma"
+curl "http://127.0.0.1:8000/servers/1/atomic"
+curl "http://127.0.0.1:8000/servers/1/gap-report"
+```
+
+---
+
+## PurpleForge — Auto-Generated Security Artifacts
+
+Every scan automatically produces four artifacts via the PurpleForge engine:
+
+1. **MITRE ATT&CK Mapping** — Each finding mapped to technique ID, tactic, and data sources
+2. **Sigma Rules** — Platform-specific detection rules for your SIEM (Windows Event Logs)
+3. **Atomic Tests** — Safe PowerShell scripts that simulate each attack vector for validation
+4. **Gap Analysis Report** — Coverage matrix showing what's detected vs what's tested
+
+Access via API or CLI:
+```bash
+# API
+curl http://127.0.0.1:8000/servers/1/sigma
+curl http://127.0.0.1:8000/servers/1/atomic
+
+# CLI
+groovehub artifacts 1 --type sigma
+groovehub artifacts 1 --type all
 ```
 
 ---
