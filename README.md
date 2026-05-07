@@ -1,5 +1,9 @@
 # GrooveHub
 
+[![Tests](https://github.com/GrooveXlabs/groovehub/actions/workflows/test.yml/badge.svg)](https://github.com/GrooveXlabs/groovehub/actions/workflows/test.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 > **The MCP Server Registry with Automated Security Scoring**
 >
 > Every MCP server scored 0-100 with [GrooveGuard](https://github.com/GrooveXlabs/grooveguard) — because trust shouldn't be blind.
@@ -165,7 +169,10 @@ pytest -v
 | Project | Description |
 |---------|-------------|
 | [grooveguard](https://github.com/GrooveXlabs/grooveguard) | AI-powered security scanner for MCP servers |
-| **groovehub** | Registry + leaderboard for scored MCP servers |
+| [groovestrike](https://github.com/GrooveXlabs/groovestrike) | Autonomous pentest framework |
+| [purpleforge](https://github.com/GrooveXlabs/purpleforge) | Purple team defense rules |
+| [threathound](https://github.com/GrooveXlabs/threathound) | Blue Team SOC automation |
+| [redtrack](https://github.com/GrooveXlabs/redtrack) | Red Team recon & attack paths |
 
 ---
 
